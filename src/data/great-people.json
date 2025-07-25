@@ -1,0 +1,37 @@
+{
+  "version": "1.0.0",
+  "dataHash": "sample-hash-2025",
+  "lastUpdated": "2025-07-25T00:00:00Z",
+  "people": [
+    {
+      "id": "einstein-albert",
+      "name": "アルベルト・アインシュタイン",
+      "birthYear": 1879,
+      "deathYear": 1955,
+      "profession": "理論物理学者",
+      "description": "相対性理論で知られるドイツ生まれの理論物理学者。光量子仮説により1921年のノーベル物理学賞を受賞。「現代物理学の父」とも呼ばれ、質量とエネルギーの等価性を表すE=mc²の方程式で有名。",
+      "quote": "想像力は知識よりも重要である。知識には限界があるが、想像力は世界を包み込む。",
+      "imageUrl": "/images/great-people/einstein-albert.jpg"
+    },
+    {
+      "id": "curie-marie",
+      "name": "マリー・キュリー",
+      "birthYear": 1867,
+      "deathYear": 1934,
+      "profession": "物理学者・化学者",
+      "description": "ポーランド出身の物理学者・化学者。放射能の研究でノーベル物理学賞（1903年）とノーベル化学賞（1911年）を受賞した初の女性科学者。ラジウムとポロニウムを発見し、「放射能」という言葉を作った。",
+      "quote": "人生には恐れるべきものなど何もない。理解すべきことがあるだけだ。",
+      "imageUrl": "/images/great-people/curie-marie.jpg"
+    },
+    {
+      "id": "da-vinci-leonardo",
+      "name": "レオナルド・ダ・ヴィンチ",
+      "birthYear": 1452,
+      "deathYear": 1519,
+      "profession": "画家・発明家・科学者",
+      "description": "イタリア・ルネサンス期の芸術家、科学者、技術者、発明家。『モナ・リザ』『最後の晩餐』などの名画で知られる一方、解剖学、工学、建築学にも精通した「万能の天才」。多くの発明のスケッチを残した。",
+      "quote": "学習することをやめた者は老人である。20歳であろうと80歳であろうと。",
+      "imageUrl": "/images/great-people/da-vinci-leonardo.jpg"
+    }
+  ]
+} 
