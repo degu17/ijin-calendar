@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:17
+    container_name: ijincalendar-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: great_people_calendar
+      POSTGRES_USER: ijincalendar
+      POSTGRES_PASSWORD: ijincalendar_dev_password
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - ijincalendar-network
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  ijincalendar-network:
+    driver: bridge 
