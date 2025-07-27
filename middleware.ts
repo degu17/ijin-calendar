@@ -1,0 +1,83 @@
+import { withAuth } from "next-auth/middleware"
+
+/**
+ * NextAuth.js認証ミドルウェア
+ * 
+ * 【学習ポイント】ミドルウェアの動作フロー
+ * 1. ユーザーがページにアクセス
+ * 2. ミドルウェアが先に実行される
+ * 3. セッション（ログイン状態）をチェック
+ * 4. ログイン済み → ページ表示
+ * 5. 未ログイン → ログインページにリダイレクト
+ */
+
+export default withAuth(
+  /**
+   * 認証済みユーザーに対して実行される処理
+   * @param req リクエストオブジェクト
+   */
+  function middleware(req) {
+    // 認証済みユーザーのみここが実行される
+    console.log("認証済みアクセス:", req.nextUrl.pathname)
+    
+    // 必要に応じて追加の権限チェックもここで実装可能
+    // 例：管理者のみアクセス可能なページ、有料プランユーザーのみなど
+  },
+  {
+    /**
+     * 認証チェックのロジック
+     */
+    callbacks: {
+      /**
+       * アクセス許可判定
+       * @param param0 トークン情報
+       * @returns true: アクセス許可, false: リダイレクト
+       */
+      authorized: ({ token, req }) => {
+        const { pathname } = req.nextUrl
+        
+        // 【学習ポイント】tokenの中身
+        // token = ログイン情報（ユーザーID、メール、名前など）
+        // token が存在する = ログイン済み
+        // token が null = 未ログイン
+        
+        console.log("アクセス先:", pathname)
+        console.log("ログイン状態:", token ? "ログイン済み" : "未ログイン")
+        
+        // ログイン済みならアクセス許可
+        return !!token
+      }
+    },
+    
+    /**
+     * 認証関連ページの設定
+     */
+    pages: {
+      signIn: "/auth/signin", // 未ログイン時のリダイレクト先
+    }
+  }
+)
+
+/**
+ * ミドルウェアを適用するパスの設定
+ * 
+ * 【重要】matcher で指定したパスのみがミドルウェアの対象
+ * 正規表現も使用可能
+ */
+export const config = {
+  matcher: [
+    /**
+     * 認証が必要なページ一覧
+     */
+    "/dashboard/:path*",      // /dashboard とその配下全て
+    "/api/user/:path*",       // ユーザー情報関連API
+    "/api/great-people/:path*", // 偉人データ関連API（ユーザー進捗含む）
+    
+    /**
+     * 【学習ポイント】パスパターンの説明
+     * - /dashboard → /dashboard ページのみ
+     * - /dashboard/:path* → /dashboard 配下全て（/dashboard/history等）
+     * - /api/user/:path* → /api/user 配下の全API
+     */
+  ]
+} 
