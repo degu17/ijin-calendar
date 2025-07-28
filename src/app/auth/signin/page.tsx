@@ -1,19 +1,87 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { signIn, getProviders } from "next-auth/react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
+
+// エラーメッセージの定義
+const ERROR_MESSAGES = {
+  CredentialsSignin: "メールアドレスまたはパスワードが正しくありません",
+  OAuthSignin: "Google認証でエラーが発生しました",
+  OAuthCallback: "認証中にエラーが発生しました",
+  OAuthCreateAccount: "アカウント作成中にエラーが発生しました",
+  EmailCreateAccount: "メールアドレスでのアカウント作成に失敗しました",
+  Callback: "認証コールバックでエラーが発生しました",
+  OAuthAccountNotLinked: "このメールアドレスは既に別の方法で登録されています",
+  EmailSignin: "メール認証でエラーが発生しました",
+  CredentialsSignup: "アカウント作成中にエラーが発生しました",
+  SessionRequired: "ログインが必要です",
+  Default: "ログインに失敗しました。しばらく時間をおいて再度お試しください"
+} as const
 
 export default function SignIn() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [attemptCount, setAttemptCount] = useState(0)
+  const [isBlocked, setIsBlocked] = useState(false)
+  const [blockTime, setBlockTime] = useState<number | null>(null)
   const router = useRouter()
+  const searchParams = useSearchParams()
+
+  // URLパラメータからのエラー処理とログイン試行制限の初期化
+  useEffect(() => {
+    const error = searchParams.get('error')
+    if (error) {
+      const errorMessage = ERROR_MESSAGES[error as keyof typeof ERROR_MESSAGES] || ERROR_MESSAGES.Default
+      setError(errorMessage)
+    }
+
+    // ローカルストレージからログイン試行回数を取得
+    const savedAttempts = localStorage.getItem('loginAttempts')
+    const savedBlockTime = localStorage.getItem('loginBlockTime')
+    
+    if (savedAttempts) {
+      setAttemptCount(parseInt(savedAttempts))
+    }
+
+    if (savedBlockTime) {
+      const blockEndTime = parseInt(savedBlockTime)
+      const now = Date.now()
+      
+      if (now < blockEndTime) {
+        setIsBlocked(true)
+        setBlockTime(blockEndTime)
+        
+        // ブロック解除のタイマー
+        const timeRemaining = blockEndTime - now
+        setTimeout(() => {
+          setIsBlocked(false)
+          setBlockTime(null)
+          setAttemptCount(0)
+          localStorage.removeItem('loginAttempts')
+          localStorage.removeItem('loginBlockTime')
+        }, timeRemaining)
+      } else {
+        // ブロック時間が過ぎていたらリセット
+        localStorage.removeItem('loginAttempts')
+        localStorage.removeItem('loginBlockTime')
+      }
+    }
+  }, [searchParams])
 
   const handleCredentialsSignIn = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // ブロック中はログインを防ぐ
+    if (isBlocked) {
+      const remainingTime = blockTime ? Math.ceil((blockTime - Date.now()) / 1000 / 60) : 0
+      setError(`ログイン試行回数が上限に達しました。${remainingTime}分後に再度お試しください。`)
+      return
+    }
+
     setLoading(true)
     setError("")
 
@@ -25,19 +93,45 @@ export default function SignIn() {
       })
 
       if (result?.error) {
-        setError("メールアドレスまたはパスワードが正しくありません")
+        const newAttemptCount = attemptCount + 1
+        setAttemptCount(newAttemptCount)
+        localStorage.setItem('loginAttempts', newAttemptCount.toString())
+
+        // 5回失敗でブロック（15分間）
+        if (newAttemptCount >= 5) {
+          const blockEndTime = Date.now() + (15 * 60 * 1000) // 15分
+          setIsBlocked(true)
+          setBlockTime(blockEndTime)
+          localStorage.setItem('loginBlockTime', blockEndTime.toString())
+          setError("ログイン試行回数が上限に達しました。15分後に再度お試しください。")
+        } else {
+          const errorMessage = ERROR_MESSAGES[result.error as keyof typeof ERROR_MESSAGES] || ERROR_MESSAGES.CredentialsSignin
+          const remainingAttempts = 5 - newAttemptCount
+          setError(`${errorMessage}（あと${remainingAttempts}回まで試行可能）`)
+        }
       } else {
+        // ログイン成功時はカウンターをリセット
+        setAttemptCount(0)
+        localStorage.removeItem('loginAttempts')
+        localStorage.removeItem('loginBlockTime')
         router.push("/dashboard")
       }
     } catch (err) {
-      setError("ログインに失敗しました。もう一度お試しください。")
+      console.error('Login error:', err)
+      setError(ERROR_MESSAGES.Default)
     } finally {
       setLoading(false)
     }
   }
 
-  const handleGoogleSignIn = () => {
-    signIn("google", { callbackUrl: "/dashboard" })
+  const handleGoogleSignIn = async () => {
+    try {
+      setError("")
+      await signIn("google", { callbackUrl: "/dashboard" })
+    } catch (err) {
+      console.error('Google sign-in error:', err)
+      setError(ERROR_MESSAGES.OAuthSignin)
+    }
   }
 
   return (
@@ -98,10 +192,10 @@ export default function SignIn() {
           <div>
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || isBlocked}
               className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? "サインイン中..." : "サインイン"}
+              {loading ? "サインイン中..." : isBlocked ? "ブロック中" : "サインイン"}
             </button>
           </div>
 

@@ -11,6 +11,8 @@ model User {
   id                String    @id @default(cuid())
   email             String    @unique
   name              String
+  image             String?   // Google OAuthのプロフィール画像
+  emailVerified     DateTime? // メール認証日時
   password          String?
   viewedGreatPeople String[]
   currentProgress   Int       @default(0)

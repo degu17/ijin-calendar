@@ -1,4 +1,5 @@
 import { withAuth } from "next-auth/middleware"
+import { NextResponse } from "next/server"
 
 /**
  * NextAuth.js認証ミドルウェア
@@ -34,18 +35,34 @@ export default withAuth(
        * @returns true: アクセス許可, false: リダイレクト
        */
       authorized: ({ token, req }) => {
-        const { pathname } = req.nextUrl
+        const { pathname, search } = req.nextUrl
         
         // 【学習ポイント】tokenの中身
         // token = ログイン情報（ユーザーID、メール、名前など）
         // token が存在する = ログイン済み
         // token が null = 未ログイン
         
+        const isLoggedIn = !!token
+        const isApiRoute = pathname.startsWith('/api/')
+        
         console.log("アクセス先:", pathname)
-        console.log("ログイン状態:", token ? "ログイン済み" : "未ログイン")
+        console.log("ログイン状態:", isLoggedIn ? "ログイン済み" : "未ログイン")
         
         // ログイン済みならアクセス許可
-        return !!token
+        if (isLoggedIn) {
+          return true
+        }
+        
+        // 未ログインの場合
+        if (isApiRoute) {
+          // API ルートの場合は認証エラーを返す（リダイレクトではなく）
+          console.log("未認証API アクセス:", pathname)
+          return false
+        } else {
+          // 通常ページの場合は SessionRequired エラーでリダイレクト
+          console.log("未認証ページアクセス - リダイレクト:", pathname)
+          return false
+        }
       }
     },
     
@@ -53,7 +70,7 @@ export default withAuth(
      * 認証関連ページの設定
      */
     pages: {
-      signIn: "/auth/signin", // 未ログイン時のリダイレクト先
+      signIn: "/auth/signin?error=SessionRequired", // セッション切れエラーでリダイレクト
     }
   }
 )

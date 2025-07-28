@@ -1,43 +1,119 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createUser } from "@/lib/user-service"
+import { sanitizeRequest, validateJsonPayload } from "@/lib/sanitize"
+import { rateLimitMiddleware, getClientIP, DEFAULT_RATE_LIMITS } from "@/lib/rate-limit"
+import { withErrorHandling, ValidationError, handleDatabaseError, successResponse } from "@/lib/error-handler"
+import { logger, securityEvents } from "@/lib/logger"
 
-export async function POST(request: NextRequest) {
+/**
+ * 新規ユーザー登録API
+ * 
+ * POST /api/auth/signup
+ * 
+ * リクエストボディ:
+ * {
+ *   email: string,
+ *   password: string,
+ *   name: string
+ * }
+ */
+const signupHandler = async (request: Request) => {
+  const clientIP = getClientIP(request)
+  const userAgent = request.headers.get('user-agent') || 'unknown'
+
+  // レート制限チェック
+  const rateLimitResponse = rateLimitMiddleware(
+    `signup:${clientIP}`,
+    DEFAULT_RATE_LIMITS.signup
+  )
+  
+  if (rateLimitResponse) {
+    logger.warn('Signup rate limit exceeded', { clientIP, userAgent })
+    return rateLimitResponse
+  }
+
+  // リクエストボディの取得と基本検証
+  const body = await request.json()
+
+  // JSONペイロードサイズ検証
+  const payloadValidation = validateJsonPayload(body)
+  if (!payloadValidation.isValid) {
+    throw new ValidationError(payloadValidation.error || 'ペイロードが無効です')
+  }
+
+  // 入力値のサニタイゼーション
+  const sanitization = sanitizeRequest(body)
+  if (!sanitization.isValid) {
+    logger.warn('Signup validation failed', { 
+      errors: sanitization.errors,
+      clientIP,
+      userAgent 
+    })
+    throw new ValidationError(sanitization.errors.join(', '))
+  }
+
+  const { email, password, name } = sanitization.sanitized
+
   try {
-    const { name, email, password } = await request.json()
-
-    // 入力値検証
-    if (!name || !email || !password) {
-      return NextResponse.json(
-        { message: "必須項目が入力されていません" },
-        { status: 400 }
-      )
-    }
-
-    // ユーザー作成
+    // ユーザー作成処理
+    logger.info('User signup attempt', { email, clientIP, userAgent })
     const newUser = await createUser(email, password, name)
 
-    // パスワードを除いてレスポンス
-    return NextResponse.json(
+    // 成功ログ
+    logger.auth('User signup successful', {
+      userId: newUser.id,
+      email: newUser.email,
+      clientIP,
+      userAgent
+    })
+
+    // 成功レスポンス（パスワードは含めない）
+    return successResponse(
       {
-        message: "ユーザー登録が完了しました",
         user: {
           id: newUser.id,
-          name: newUser.name,
           email: newUser.email,
+          name: newUser.name,
+          createdAt: newUser.createdAt,
         },
       },
-      { status: 201 }
+      "アカウントが正常に作成されました",
+      undefined,
+      201
     )
-  } catch (error: any) {
-    console.error("ユーザー登録エラー:", error)
 
-    // エラーメッセージを適切に処理
-    const message = error.message || "ユーザー登録に失敗しました"
-    const status = error.message?.includes("既に登録") ? 409 : 500
+  } catch (error) {
+    // データベースエラーの適切な処理
+    if (error instanceof Error) {
+      // 重複メールアドレスエラーの場合
+      if (error.message.includes("既に登録されています")) {
+        securityEvents.suspiciousActivity(
+          `Duplicate email signup attempt: ${email}`,
+          undefined,
+          clientIP
+        )
+        throw new ValidationError("このメールアドレスは既に登録されています")
+      }
 
-    return NextResponse.json(
-      { message },
-      { status }
-    )
+      // データベースエラー
+      throw handleDatabaseError(error)
+    }
+
+    throw error
   }
+}
+
+export const POST = withErrorHandling(signupHandler)
+
+/**
+ * 許可されていないHTTPメソッドへの対応
+ */
+export async function GET() {
+  return NextResponse.json(
+    { 
+      success: false,
+      message: "このエンドポイントはPOSTメソッドのみサポートしています" 
+    },
+    { status: 405 }
+  )
 } 

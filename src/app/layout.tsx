@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import SessionProviderWrapper from "../components/SessionProviderWrapper";
+import ErrorBoundary from "../components/ErrorBoundary";
+import AccessibilityWrapper from "../components/ui/AccessibilityWrapper";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -24,13 +26,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ja">
+    <html lang="ja" className="h-full">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased h-full overflow-hidden`}
       >
-        <SessionProviderWrapper>
-          {children}
-        </SessionProviderWrapper>
+        <AccessibilityWrapper>
+          <ErrorBoundary>
+            <SessionProviderWrapper>
+              {children}
+            </SessionProviderWrapper>
+          </ErrorBoundary>
+        </AccessibilityWrapper>
       </body>
     </html>
   );
